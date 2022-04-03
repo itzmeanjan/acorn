@@ -22,7 +22,7 @@ maj(const bool x, const bool y, const bool z)
 static inline bool
 ch(const bool x, const bool y, const bool z)
 {
-  return (x & y) ^ (~x & z);
+  return (x & y) ^ (!x & z);
 }
 
 // Generate keystream bit, taken from section 1.3.2 of Acorn specification
@@ -48,12 +48,12 @@ fbk128(const bool* const state, // 293 -bit state
 {
   const bool b0 = maj(state[244], state[23], state[160]);
 
-  return state[0] ^ ~state[107] ^ b0 ^ (ca & state[196]) ^ (cb & ks);
+  return state[0] ^ !state[107] ^ b0 ^ (ca & state[196]) ^ (cb & ks);
 }
 
 // Update state function, using algorithm written in section 1.3.2 of Acorn
 // specification https://competitions.cr.yp.to/round3/acornv3.pdf
-static inline void
+static inline bool
 state_update_128(bool* const state, // 293 -bit state
                  const bool m,      // message bit
                  const bool ca,     // control bit `a`
@@ -76,6 +76,8 @@ state_update_128(bool* const state, // 293 -bit state
     state[j] = state[j + 1];
   }
   state[292] = fb ^ m;
+
+  return ks;
 }
 
 // Initialize Acorn128 state, following algorithm specified in section 1.3.3 of
@@ -122,7 +124,7 @@ template<const size_t pos>
 static inline bool
 bit_at(const uint8_t byte) requires(check_pos(pos))
 {
-  return (byte >> pos) & static_cast<uint8_t>(0b1u);
+  return static_cast<bool>((byte >> pos) & static_cast<uint8_t>(0b1u));
 }
 
 // Processing the associated data bytes, following algorithm described in
@@ -160,6 +162,81 @@ process_associated_data(
 
   for (size_t i = 128; i < 256; i++) {
     state_update_128(state, false, false, true);
+  }
+}
+
+// Encrypt plain text bytes and write ciphered bytes to allocated memory
+// location, following algorithm defined in section 1.3.5 of Acorn specification
+// https://competitions.cr.yp.to/round3/acornv3.pdf
+static inline void
+process_plain_text(bool* const __restrict state,         // 293 -bit state
+                   const uint8_t* const __restrict text, // plain text bytes
+                   uint8_t* const __restrict cipher,     // ciphered data bytes
+                   const size_t ct_len                   // can be >= 0
+)
+{
+  // line 1 of step 1; compute encrypted bits
+  //
+  // also see step 3 of algorithm defined in section 1.3.5
+  for (size_t i = 0; i < ct_len; i++) {
+    const uint8_t byte = text[i];
+
+    const bool p7 = bit_at<7>(byte);
+    const bool ks7 = state_update_128(state, p7, true, false);
+    const bool c7 = ks7 ^ p7; // encrypted bit
+
+    const bool p6 = bit_at<6>(byte);
+    const bool ks6 = state_update_128(state, p6, true, false);
+    const bool c6 = ks6 ^ p6; // encrypted bit
+
+    const bool p5 = bit_at<5>(byte);
+    const bool ks5 = state_update_128(state, p5, true, false);
+    const bool c5 = ks5 ^ p5; // encrypted bit
+
+    const bool p4 = bit_at<4>(byte);
+    const bool ks4 = state_update_128(state, p4, true, false);
+    const bool c4 = ks4 ^ p4; // encrypted bit
+
+    const bool p3 = bit_at<3>(byte);
+    const bool ks3 = state_update_128(state, p3, true, false);
+    const bool c3 = ks3 ^ p3; // encrypted bit
+
+    const bool p2 = bit_at<2>(byte);
+    const bool ks2 = state_update_128(state, p2, true, false);
+    const bool c2 = ks2 ^ p2; // encrypted bit
+
+    const bool p1 = bit_at<1>(byte);
+    const bool ks1 = state_update_128(state, p1, true, false);
+    const bool c1 = ks1 ^ p1; // encrypted bit
+
+    const bool p0 = bit_at<0>(byte);
+    const bool ks0 = state_update_128(state, p0, true, false);
+    const bool c0 = ks0 ^ p0; // encrypted bit
+
+    // from 8 encrypted bits prepare single ciphered byte
+    const uint8_t enc = static_cast<uint8_t>(static_cast<uint8_t>(c7) << 7) |
+                        static_cast<uint8_t>(static_cast<uint8_t>(c6) << 6) |
+                        static_cast<uint8_t>(static_cast<uint8_t>(c5) << 5) |
+                        static_cast<uint8_t>(static_cast<uint8_t>(c4) << 4) |
+                        static_cast<uint8_t>(static_cast<uint8_t>(c3) << 3) |
+                        static_cast<uint8_t>(static_cast<uint8_t>(c2) << 2) |
+                        static_cast<uint8_t>(static_cast<uint8_t>(c1) << 1) |
+                        static_cast<uint8_t>(static_cast<uint8_t>(c0));
+
+    // write 8 encrypted bits to allocated memory
+    cipher[i] = enc;
+  }
+
+  // line 2 of step 1; append single `1` -bit
+  state_update_128(state, true, true, false);
+
+  // line 3 of step 1; append 255 `0` -bits
+  for (size_t i = 1; i < 128; i++) {
+    state_update_128(state, false, true, false);
+  }
+
+  for (size_t i = 128; i < 256; i++) {
+    state_update_128(state, false, false, false);
   }
 }
 
