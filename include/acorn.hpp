@@ -108,4 +108,59 @@ initialize(bool* const __restrict state,     // 293 -bit state
   // --- step 2, 3, 4 ---
 }
 
+// Compile time evaluation of template argument for `bit_at` routine; ensuring
+// requested bit position stays inside [0, 8)
+constexpr bool
+check_pos(const size_t pos)
+{
+  return pos < 8;
+}
+
+// Given 8 -bit unsigned integer, it selects requested bit value
+// for `pos` | 0 <= pos <= 7
+template<const size_t pos>
+static inline bool
+bit_at(const uint8_t byte) requires(check_pos(pos))
+{
+  return (byte >> pos) & static_cast<uint8_t>(0b1u);
+}
+
+// Processing the associated data bytes, following algorithm described in
+// section 1.3.4 of Acorn specification
+// https://competitions.cr.yp.to/round3/acornv3.pdf
+static inline void
+process_associated_data(
+  bool* const __restrict state,         // 293 -bit state
+  const uint8_t* const __restrict data, // associated data bytes
+  const size_t data_len                 // len(data), can be >= 0
+)
+{
+  // line 1 of step 1; consume all associated data bits
+  for (size_t i = 0; i < data_len; i++) {
+    const uint8_t byte = data[i];
+
+    // sequentially consume 8 -bits per byte
+    state_update_128(state, bit_at<7>(byte), true, true);
+    state_update_128(state, bit_at<6>(byte), true, true);
+    state_update_128(state, bit_at<5>(byte), true, true);
+    state_update_128(state, bit_at<4>(byte), true, true);
+    state_update_128(state, bit_at<3>(byte), true, true);
+    state_update_128(state, bit_at<2>(byte), true, true);
+    state_update_128(state, bit_at<1>(byte), true, true);
+    state_update_128(state, bit_at<0>(byte), true, true);
+  }
+
+  // line 2 of step 1; append single `1` -bit
+  state_update_128(state, true, true, true);
+
+  // line 3 of step 1; append 255 `0` -bits
+  for (size_t i = 1; i < 128; i++) {
+    state_update_128(state, false, true, true);
+  }
+
+  for (size_t i = 128; i < 256; i++) {
+    state_update_128(state, false, false, true);
+  }
+}
+
 }
