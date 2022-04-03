@@ -5,6 +5,10 @@ using size_t = std::size_t;
 
 namespace acorn {
 
+// Acorn state bit length, see section 1.3.1 of Acorn specification
+// https://competitions.cr.yp.to/round3/acornv3.pdf
+constexpr size_t STATE_BIT_LEN = 293ul;
+
 // Acorn boolean function `maj`, taken from section 1.2.3 of Acorn specification
 // https://competitions.cr.yp.to/round3/acornv3.pdf
 static inline bool
@@ -68,10 +72,40 @@ state_update_128(bool* const state, // 293 -bit state
   // step 3
   const bool fb = fbk128(state, ca, cb, ks); // feedback bit
   // step 4
-  for (size_t j = 0; j < 292; j++) {
+  for (size_t j = 0; j < STATE_BIT_LEN - 1ul; j++) {
     state[j] = state[j + 1];
   }
   state[292] = fb ^ m;
+}
+
+// Initialize Acorn128 state, following algorithm specified in section 1.3.3 of
+// Acorn specification https://competitions.cr.yp.to/round3/acornv3.pdf
+static inline void
+initialize(bool* const __restrict state,     // 293 -bit state
+           const bool* const __restrict key, // 128 -bit secret key
+           const bool* const __restrict iv   // 128 -bit initialization vector
+)
+{
+  // step 1
+  for (size_t i = 0; i < STATE_BIT_LEN; i++) {
+    state[i] = false;
+  }
+
+  // --- step 2, 3, 4 ---
+  for (size_t i = 0; i < 128; i++) {
+    state_update_128(state, key[i], true, true);
+  }
+
+  for (size_t i = 0; i < 128; i++) {
+    state_update_128(state, iv[i], true, true);
+  }
+
+  state_update_128(state, key[0] ^ true, true, true);
+
+  for (size_t i = 1; i < 1536; i++) {
+    state_update_128(state, key[i % 128], true, true);
+  }
+  // --- step 2, 3, 4 ---
 }
 
 }
