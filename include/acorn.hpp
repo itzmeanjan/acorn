@@ -240,4 +240,44 @@ process_plain_text(bool* const __restrict state,         // 293 -bit state
   }
 }
 
+// Finalize Acorn-128, which generates authentication tag; this is result of
+// authenticated encryption process & it also helps in conducting verified
+// decryption
+//
+// See algorithm defined in section 1.3.6 of Acorn specification
+// https://competitions.cr.yp.to/round3/acornv3.pdf
+static inline void
+finalize(bool* const __restrict state, uint8_t* const __restrict tag)
+{
+  for (size_t i = 0; i < 640; i++) {
+    state_update_128(state, false, true, true);
+  }
+
+  // take last 128 keystream bits & interpret it as authentication tag
+  for (size_t i = 0; i < 16; i++) {
+    // compute 8 authentication tag bits; do it 16 times;
+    // making 128 -bit authentication tag
+    const bool b7 = state_update_128(state, false, true, true);
+    const bool b6 = state_update_128(state, false, true, true);
+    const bool b5 = state_update_128(state, false, true, true);
+    const bool b4 = state_update_128(state, false, true, true);
+    const bool b3 = state_update_128(state, false, true, true);
+    const bool b2 = state_update_128(state, false, true, true);
+    const bool b1 = state_update_128(state, false, true, true);
+    const bool b0 = state_update_128(state, false, true, true);
+
+    // authentication tag byte
+    const uint8_t t_byte = static_cast<uint8_t>(static_cast<uint8_t>(b7) << 7) |
+                           static_cast<uint8_t>(static_cast<uint8_t>(b6) << 6) |
+                           static_cast<uint8_t>(static_cast<uint8_t>(b5) << 5) |
+                           static_cast<uint8_t>(static_cast<uint8_t>(b4) << 4) |
+                           static_cast<uint8_t>(static_cast<uint8_t>(b3) << 3) |
+                           static_cast<uint8_t>(static_cast<uint8_t>(b2) << 2) |
+                           static_cast<uint8_t>(static_cast<uint8_t>(b1) << 1) |
+                           static_cast<uint8_t>(static_cast<uint8_t>(b0));
+
+    tag[i] = t_byte;
+  }
+}
+
 }
