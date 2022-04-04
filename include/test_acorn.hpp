@@ -3,6 +3,8 @@
 #include <cassert>
 #include <string.h>
 
+// Tests Acorn-128 AEAD implementation; read more about AEAD
+// https://en.wikipedia.org/wiki/Authenticated_encryption
 namespace test_acorn {
 
 static inline void
