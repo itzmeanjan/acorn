@@ -147,15 +147,15 @@ process_associated_data(
   for (size_t i = 0; i < data_len; i++) {
     const uint8_t byte = data[i];
 
-    // sequentially consume 8 -bits per byte
-    state_update_128(state, bit_at<7>(byte), true, true);
-    state_update_128(state, bit_at<6>(byte), true, true);
-    state_update_128(state, bit_at<5>(byte), true, true);
-    state_update_128(state, bit_at<4>(byte), true, true);
-    state_update_128(state, bit_at<3>(byte), true, true);
-    state_update_128(state, bit_at<2>(byte), true, true);
-    state_update_128(state, bit_at<1>(byte), true, true);
+    // sequentially consume 8 -bits ( LSB to MSB ) per byte
     state_update_128(state, bit_at<0>(byte), true, true);
+    state_update_128(state, bit_at<1>(byte), true, true);
+    state_update_128(state, bit_at<2>(byte), true, true);
+    state_update_128(state, bit_at<3>(byte), true, true);
+    state_update_128(state, bit_at<4>(byte), true, true);
+    state_update_128(state, bit_at<5>(byte), true, true);
+    state_update_128(state, bit_at<6>(byte), true, true);
+    state_update_128(state, bit_at<7>(byte), true, true);
   }
 
   // line 2 of step 1; append single `1` -bit
@@ -187,37 +187,37 @@ process_plain_text(bool* const __restrict state,         // 293 -bit state
   for (size_t i = 0; i < ct_len; i++) {
     const uint8_t byte = text[i];
 
-    const bool p7 = bit_at<7>(byte);
-    const bool ks7 = state_update_128(state, p7, true, false);
-    const bool c7 = ks7 ^ p7; // encrypted bit
-
-    const bool p6 = bit_at<6>(byte);
-    const bool ks6 = state_update_128(state, p6, true, false);
-    const bool c6 = ks6 ^ p6; // encrypted bit
-
-    const bool p5 = bit_at<5>(byte);
-    const bool ks5 = state_update_128(state, p5, true, false);
-    const bool c5 = ks5 ^ p5; // encrypted bit
-
-    const bool p4 = bit_at<4>(byte);
-    const bool ks4 = state_update_128(state, p4, true, false);
-    const bool c4 = ks4 ^ p4; // encrypted bit
-
-    const bool p3 = bit_at<3>(byte);
-    const bool ks3 = state_update_128(state, p3, true, false);
-    const bool c3 = ks3 ^ p3; // encrypted bit
-
-    const bool p2 = bit_at<2>(byte);
-    const bool ks2 = state_update_128(state, p2, true, false);
-    const bool c2 = ks2 ^ p2; // encrypted bit
+    const bool p0 = bit_at<0>(byte);
+    const bool ks0 = state_update_128(state, p0, true, false);
+    const bool c0 = ks0 ^ p0; // encrypted bit
 
     const bool p1 = bit_at<1>(byte);
     const bool ks1 = state_update_128(state, p1, true, false);
     const bool c1 = ks1 ^ p1; // encrypted bit
 
-    const bool p0 = bit_at<0>(byte);
-    const bool ks0 = state_update_128(state, p0, true, false);
-    const bool c0 = ks0 ^ p0; // encrypted bit
+    const bool p2 = bit_at<2>(byte);
+    const bool ks2 = state_update_128(state, p2, true, false);
+    const bool c2 = ks2 ^ p2; // encrypted bit
+
+    const bool p3 = bit_at<3>(byte);
+    const bool ks3 = state_update_128(state, p3, true, false);
+    const bool c3 = ks3 ^ p3; // encrypted bit
+
+    const bool p4 = bit_at<4>(byte);
+    const bool ks4 = state_update_128(state, p4, true, false);
+    const bool c4 = ks4 ^ p4; // encrypted bit
+
+    const bool p5 = bit_at<5>(byte);
+    const bool ks5 = state_update_128(state, p5, true, false);
+    const bool c5 = ks5 ^ p5; // encrypted bit
+
+    const bool p6 = bit_at<6>(byte);
+    const bool ks6 = state_update_128(state, p6, true, false);
+    const bool c6 = ks6 ^ p6; // encrypted bit
+
+    const bool p7 = bit_at<7>(byte);
+    const bool ks7 = state_update_128(state, p7, true, false);
+    const bool c7 = ks7 ^ p7; // encrypted bit
 
     // from 8 encrypted bits prepare single ciphered byte
     const uint8_t enc = static_cast<uint8_t>(static_cast<uint8_t>(c7) << 7) |
@@ -263,45 +263,45 @@ process_cipher_text(
   for (size_t i = 0; i < ct_len; i++) {
     const uint8_t byte = cipher[i];
 
-    const bool p7 = bit_at<7>(byte);
-    const bool ks7 = state_update_128(state, p7, true, false);
-    state[292] ^= ks7;        // update state with decrypted bit
-    const bool c7 = ks7 ^ p7; // decrypted bit
-
-    const bool p6 = bit_at<6>(byte);
-    const bool ks6 = state_update_128(state, p6, true, false);
-    state[292] ^= ks6;        // update state with decrypted bit
-    const bool c6 = ks6 ^ p6; // decrypted bit
-
-    const bool p5 = bit_at<5>(byte);
-    const bool ks5 = state_update_128(state, p5, true, false);
-    state[292] ^= ks5;        // update state with decrypted bit
-    const bool c5 = ks5 ^ p5; // decrypted bit
-
-    const bool p4 = bit_at<4>(byte);
-    const bool ks4 = state_update_128(state, p4, true, false);
-    state[292] ^= ks4;        // update state with decrypted bit
-    const bool c4 = ks4 ^ p4; // decrypted bit
-
-    const bool p3 = bit_at<3>(byte);
-    const bool ks3 = state_update_128(state, p3, true, false);
-    state[292] ^= ks3;        // update state with decrypted bit
-    const bool c3 = ks3 ^ p3; // decrypted bit
-
-    const bool p2 = bit_at<2>(byte);
-    const bool ks2 = state_update_128(state, p2, true, false);
-    state[292] ^= ks2;        // update state with decrypted bit
-    const bool c2 = ks2 ^ p2; // decrypted bit
+    const bool p0 = bit_at<0>(byte);
+    const bool ks0 = state_update_128(state, p0, true, false);
+    state[292] ^= ks0;        // update state with decrypted bit
+    const bool c0 = ks0 ^ p0; // decrypted bit
 
     const bool p1 = bit_at<1>(byte);
     const bool ks1 = state_update_128(state, p1, true, false);
     state[292] ^= ks1;        // update state with decrypted bit
     const bool c1 = ks1 ^ p1; // decrypted bit
 
-    const bool p0 = bit_at<0>(byte);
-    const bool ks0 = state_update_128(state, p0, true, false);
-    state[292] ^= ks0;        // update state with decrypted bit
-    const bool c0 = ks0 ^ p0; // decrypted bit
+    const bool p2 = bit_at<2>(byte);
+    const bool ks2 = state_update_128(state, p2, true, false);
+    state[292] ^= ks2;        // update state with decrypted bit
+    const bool c2 = ks2 ^ p2; // decrypted bit
+
+    const bool p3 = bit_at<3>(byte);
+    const bool ks3 = state_update_128(state, p3, true, false);
+    state[292] ^= ks3;        // update state with decrypted bit
+    const bool c3 = ks3 ^ p3; // decrypted bit
+
+    const bool p4 = bit_at<4>(byte);
+    const bool ks4 = state_update_128(state, p4, true, false);
+    state[292] ^= ks4;        // update state with decrypted bit
+    const bool c4 = ks4 ^ p4; // decrypted bit
+
+    const bool p5 = bit_at<5>(byte);
+    const bool ks5 = state_update_128(state, p5, true, false);
+    state[292] ^= ks5;        // update state with decrypted bit
+    const bool c5 = ks5 ^ p5; // decrypted bit
+
+    const bool p6 = bit_at<6>(byte);
+    const bool ks6 = state_update_128(state, p6, true, false);
+    state[292] ^= ks6;        // update state with decrypted bit
+    const bool c6 = ks6 ^ p6; // decrypted bit
+
+    const bool p7 = bit_at<7>(byte);
+    const bool ks7 = state_update_128(state, p7, true, false);
+    state[292] ^= ks7;        // update state with decrypted bit
+    const bool c7 = ks7 ^ p7; // decrypted bit
 
     // from 8 decrypted bits prepare single deciphered byte
     const uint8_t enc = static_cast<uint8_t>(static_cast<uint8_t>(c7) << 7) |
@@ -347,14 +347,14 @@ finalize(bool* const __restrict state, uint8_t* const __restrict tag)
   for (size_t i = 0; i < 16; i++) {
     // compute 8 authentication tag bits; do it 16 times;
     // making 128 -bit authentication tag
-    const bool b7 = state_update_128(state, false, true, true);
-    const bool b6 = state_update_128(state, false, true, true);
-    const bool b5 = state_update_128(state, false, true, true);
-    const bool b4 = state_update_128(state, false, true, true);
-    const bool b3 = state_update_128(state, false, true, true);
-    const bool b2 = state_update_128(state, false, true, true);
-    const bool b1 = state_update_128(state, false, true, true);
     const bool b0 = state_update_128(state, false, true, true);
+    const bool b1 = state_update_128(state, false, true, true);
+    const bool b2 = state_update_128(state, false, true, true);
+    const bool b3 = state_update_128(state, false, true, true);
+    const bool b4 = state_update_128(state, false, true, true);
+    const bool b5 = state_update_128(state, false, true, true);
+    const bool b6 = state_update_128(state, false, true, true);
+    const bool b7 = state_update_128(state, false, true, true);
 
     // authentication tag byte
     const uint8_t t_byte = static_cast<uint8_t>(static_cast<uint8_t>(b7) << 7) |
@@ -368,149 +368,6 @@ finalize(bool* const __restrict state, uint8_t* const __restrict tag)
 
     tag[i] = t_byte;
   }
-}
-
-// Acorn-128 authenticated encryption, given `t_len` -bytes plain text, `d_len`
-// -bytes associated data, 128 -bit secret key & 128 -bit public message nonce,
-// this routine computes `c_len` -bytes encrypted text along with 128 -bit
-// authentication tag
-//
-// Note, assert t_len == c_len
-//
-// See algorithms defined in section 1.3.{3,4,5,6} of Acorn specification
-// https://competitions.cr.yp.to/round3/acornv3.pdf
-static inline void
-encrypt(const uint8_t* const __restrict key,   // 128 -bit secret key
-        const uint8_t* const __restrict nonce, // 128 -bit message nonce
-        const uint8_t* const __restrict text,  // plain text
-        const size_t ct_len,                   // len(text), len(cipher)
-        const uint8_t* const __restrict data,  // associated data bytes
-        const size_t d_len,                    // len(data)
-        uint8_t* const __restrict cipher,      // encrypted bytes
-        uint8_t* const __restrict tag          // 128 -bit authentication tag
-)
-{
-  // 293 -bit Acorn-128 state
-  bool state[STATE_BIT_LEN];
-
-  // 128 -bit secret key as bit sequence
-  bool key_[128];
-#pragma unroll 16
-  for (size_t i = 0; i < 16; i++) {
-    const size_t off = i << 3;
-
-    key_[off + 0] = bit_at<7>(key[i]);
-    key_[off + 1] = bit_at<6>(key[i]);
-    key_[off + 2] = bit_at<5>(key[i]);
-    key_[off + 3] = bit_at<4>(key[i]);
-    key_[off + 4] = bit_at<3>(key[i]);
-    key_[off + 5] = bit_at<2>(key[i]);
-    key_[off + 6] = bit_at<1>(key[i]);
-    key_[off + 7] = bit_at<0>(key[i]);
-  }
-
-  // 128 -bit public message nonce as bit sequence
-  bool nonce_[128];
-#pragma unroll 16
-  for (size_t i = 0; i < 16; i++) {
-    const size_t off = i << 3;
-
-    nonce_[off + 0] = bit_at<7>(nonce[i]);
-    nonce_[off + 1] = bit_at<6>(nonce[i]);
-    nonce_[off + 2] = bit_at<5>(nonce[i]);
-    nonce_[off + 3] = bit_at<4>(nonce[i]);
-    nonce_[off + 4] = bit_at<3>(nonce[i]);
-    nonce_[off + 5] = bit_at<2>(nonce[i]);
-    nonce_[off + 6] = bit_at<1>(nonce[i]);
-    nonce_[off + 7] = bit_at<0>(nonce[i]);
-  }
-
-  // see section 1.3.3
-  initialize(state, key_, nonce_);
-  // see section 1.3.4
-  process_associated_data(state, data, d_len);
-  // see section 1.3.5
-  process_plain_text(state, text, cipher, ct_len);
-  // see section 1.3.6
-  finalize(state, tag);
-}
-
-// Acorn-128 verified decryption, given `c_len` -bytes encrypted text, `d_len`
-// -bytes associated data, 128 -bit secret key, 128 -bit public message nonce &
-// 128 -bit authentication tag, this routine computes `t_len` -bytes decrypted
-// text along with boolean verification flag `f`, denoting success of
-// verification process
-//
-// Always ensure `assert f`, otherwise something is off !
-//
-// Note, assert c_len == t_len
-//
-// See algorithms defined in section 1.3.{3,4,5,6} of Acorn specification
-// https://competitions.cr.yp.to/round3/acornv3.pdf
-static inline bool
-decrypt(const uint8_t* const __restrict key,    // 128 -bit secret key
-        const uint8_t* const __restrict nonce,  // 128 -bit message nonce
-        const uint8_t* const __restrict tag,    // 128 -bit authentication tag
-        const uint8_t* const __restrict cipher, // encrypted bytes
-        const size_t ct_len,                    // len(cipher), len(text)
-        const uint8_t* const __restrict data,   // associated data bytes
-        const size_t d_len,                     // len(data)
-        uint8_t* const __restrict text          // decrypted bytes
-)
-{
-  // 293 -bit Acorn-128 state
-  bool state[STATE_BIT_LEN];
-  // 128 -bit authentication tag
-  uint8_t tag_[16];
-
-  // 128 -bit secret key as bit sequence
-  bool key_[128];
-#pragma unroll 16
-  for (size_t i = 0; i < 16; i++) {
-    const size_t off = i << 3;
-
-    key_[off + 0] = bit_at<7>(key[i]);
-    key_[off + 1] = bit_at<6>(key[i]);
-    key_[off + 2] = bit_at<5>(key[i]);
-    key_[off + 3] = bit_at<4>(key[i]);
-    key_[off + 4] = bit_at<3>(key[i]);
-    key_[off + 5] = bit_at<2>(key[i]);
-    key_[off + 6] = bit_at<1>(key[i]);
-    key_[off + 7] = bit_at<0>(key[i]);
-  }
-
-  // 128 -bit public message nonce as bit sequence
-  bool nonce_[128];
-#pragma unroll 16
-  for (size_t i = 0; i < 16; i++) {
-    const size_t off = i << 3;
-
-    nonce_[off + 0] = bit_at<7>(nonce[i]);
-    nonce_[off + 1] = bit_at<6>(nonce[i]);
-    nonce_[off + 2] = bit_at<5>(nonce[i]);
-    nonce_[off + 3] = bit_at<4>(nonce[i]);
-    nonce_[off + 4] = bit_at<3>(nonce[i]);
-    nonce_[off + 5] = bit_at<2>(nonce[i]);
-    nonce_[off + 6] = bit_at<1>(nonce[i]);
-    nonce_[off + 7] = bit_at<0>(nonce[i]);
-  }
-
-  // see section 1.3.3
-  initialize(state, key_, nonce_);
-  // see section 1.3.4
-  process_associated_data(state, data, d_len);
-  // see section 1.3.5
-  process_cipher_text(state, cipher, text, ct_len);
-  // see section 1.3.6
-  finalize(state, tag_);
-
-  // verification flag
-  bool fail = false;
-  // compare authentication tag byte-by-byte
-  for (size_t i = 0; i < 16; i++) {
-    fail |= (tag[i] ^ tag_[i]);
-  }
-  return !fail;
 }
 
 }
