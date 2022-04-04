@@ -221,7 +221,7 @@ process_plain_text(bool* const __restrict state,         // 293 -bit state
                         static_cast<uint8_t>(static_cast<uint8_t>(c3) << 3) |
                         static_cast<uint8_t>(static_cast<uint8_t>(c2) << 2) |
                         static_cast<uint8_t>(static_cast<uint8_t>(c1) << 1) |
-                        static_cast<uint8_t>(static_cast<uint8_t>(c0));
+                        static_cast<uint8_t>(c0);
 
     // write 8 encrypted bits to allocated memory
     cipher[i] = enc;
@@ -251,7 +251,77 @@ process_cipher_text(
   const size_t ct_len                     // can be >= 0
 )
 {
-  process_plain_text(state, cipher, text, ct_len);
+  // line 1 of step 1; compute decrypted bits
+  //
+  // also see step 3 of algorithm defined in section 1.3.5
+  for (size_t i = 0; i < ct_len; i++) {
+    const uint8_t byte = cipher[i];
+
+    const bool p7 = bit_at<7>(byte);
+    const bool ks7 = state_update_128(state, p7, true, false);
+    state[292] ^= ks7;        // update state with decrypted bit
+    const bool c7 = ks7 ^ p7; // decrypted bit
+
+    const bool p6 = bit_at<6>(byte);
+    const bool ks6 = state_update_128(state, p6, true, false);
+    state[292] ^= ks6;        // update state with decrypted bit
+    const bool c6 = ks6 ^ p6; // decrypted bit
+
+    const bool p5 = bit_at<5>(byte);
+    const bool ks5 = state_update_128(state, p5, true, false);
+    state[292] ^= ks5;        // update state with decrypted bit
+    const bool c5 = ks5 ^ p5; // decrypted bit
+
+    const bool p4 = bit_at<4>(byte);
+    const bool ks4 = state_update_128(state, p4, true, false);
+    state[292] ^= ks4;        // update state with decrypted bit
+    const bool c4 = ks4 ^ p4; // decrypted bit
+
+    const bool p3 = bit_at<3>(byte);
+    const bool ks3 = state_update_128(state, p3, true, false);
+    state[292] ^= ks3;        // update state with decrypted bit
+    const bool c3 = ks3 ^ p3; // decrypted bit
+
+    const bool p2 = bit_at<2>(byte);
+    const bool ks2 = state_update_128(state, p2, true, false);
+    state[292] ^= ks2;        // update state with decrypted bit
+    const bool c2 = ks2 ^ p2; // decrypted bit
+
+    const bool p1 = bit_at<1>(byte);
+    const bool ks1 = state_update_128(state, p1, true, false);
+    state[292] ^= ks1;        // update state with decrypted bit
+    const bool c1 = ks1 ^ p1; // decrypted bit
+
+    const bool p0 = bit_at<0>(byte);
+    const bool ks0 = state_update_128(state, p0, true, false);
+    state[292] ^= ks0;        // update state with decrypted bit
+    const bool c0 = ks0 ^ p0; // decrypted bit
+
+    // from 8 decrypted bits prepare single deciphered byte
+    const uint8_t enc = static_cast<uint8_t>(static_cast<uint8_t>(c7) << 7) |
+                        static_cast<uint8_t>(static_cast<uint8_t>(c6) << 6) |
+                        static_cast<uint8_t>(static_cast<uint8_t>(c5) << 5) |
+                        static_cast<uint8_t>(static_cast<uint8_t>(c4) << 4) |
+                        static_cast<uint8_t>(static_cast<uint8_t>(c3) << 3) |
+                        static_cast<uint8_t>(static_cast<uint8_t>(c2) << 2) |
+                        static_cast<uint8_t>(static_cast<uint8_t>(c1) << 1) |
+                        static_cast<uint8_t>(c0);
+
+    // write 8 decrypted bits to allocated memory
+    text[i] = enc;
+  }
+
+  // line 2 of step 1; append single `1` -bit
+  state_update_128(state, true, true, false);
+
+  // line 3 of step 1; append 255 `0` -bits
+  for (size_t i = 1; i < 128; i++) {
+    state_update_128(state, false, true, false);
+  }
+
+  for (size_t i = 128; i < 256; i++) {
+    state_update_128(state, false, false, false);
+  }
 }
 
 // Finalize Acorn-128, which generates authentication tag; this is result of
@@ -288,7 +358,7 @@ finalize(bool* const __restrict state, uint8_t* const __restrict tag)
                            static_cast<uint8_t>(static_cast<uint8_t>(b3) << 3) |
                            static_cast<uint8_t>(static_cast<uint8_t>(b2) << 2) |
                            static_cast<uint8_t>(static_cast<uint8_t>(b1) << 1) |
-                           static_cast<uint8_t>(static_cast<uint8_t>(b0));
+                           static_cast<uint8_t>(b0);
 
     tag[i] = t_byte;
   }
@@ -307,11 +377,10 @@ static inline void
 encrypt(const uint8_t* const __restrict key,   // 128 -bit secret key
         const uint8_t* const __restrict nonce, // 128 -bit message nonce
         const uint8_t* const __restrict text,  // plain text
-        const size_t t_len,                    // len(text)
+        const size_t ct_len,                   // len(text), len(cipher)
         const uint8_t* const __restrict data,  // associated data bytes
         const size_t d_len,                    // len(data)
         uint8_t* const __restrict cipher,      // encrypted bytes
-        const size_t c_len,                    // len(cipher); c_len == t_len
         uint8_t* const __restrict tag          // 128 -bit authentication tag
 )
 {
@@ -355,7 +424,7 @@ encrypt(const uint8_t* const __restrict key,   // 128 -bit secret key
   // see section 1.3.4
   process_associated_data(state, data, d_len);
   // see section 1.3.5
-  process_plain_text(state, text, cipher, t_len);
+  process_plain_text(state, text, cipher, ct_len);
   // see section 1.3.6
   finalize(state, tag);
 }
@@ -363,7 +432,8 @@ encrypt(const uint8_t* const __restrict key,   // 128 -bit secret key
 // Acorn-128 verified decryption, given `c_len` -bytes encrypted text, `d_len`
 // -bytes associated data, 128 -bit secret key, 128 -bit public message nonce &
 // 128 -bit authentication tag, this routine computes `t_len` -bytes decrypted
-// text along with boolean verification flag `f`;
+// text along with boolean verification flag `f`, denoting success of
+// verification process
 //
 // Always ensure `assert f`, otherwise something is off !
 //
@@ -376,11 +446,10 @@ decrypt(const uint8_t* const __restrict key,    // 128 -bit secret key
         const uint8_t* const __restrict nonce,  // 128 -bit message nonce
         const uint8_t* const __restrict tag,    // 128 -bit authentication tag
         const uint8_t* const __restrict cipher, // encrypted bytes
-        const size_t c_len,                     // len(cipher)
+        const size_t ct_len,                    // len(cipher), len(text)
         const uint8_t* const __restrict data,   // associated data bytes
         const size_t d_len,                     // len(data)
-        uint8_t* const __restrict text,         // decrypted bytes
-        const size_t t_len                      // len(text); t_len == c_len
+        uint8_t* const __restrict text          // decrypted bytes
 )
 {
   // 293 -bit Acorn-128 state
@@ -425,17 +494,17 @@ decrypt(const uint8_t* const __restrict key,    // 128 -bit secret key
   // see section 1.3.4
   process_associated_data(state, data, d_len);
   // see section 1.3.5
-  process_cipher_text(state, cipher, text, c_len);
+  process_cipher_text(state, cipher, text, ct_len);
   // see section 1.3.6
   finalize(state, tag_);
 
   // verification flag
-  bool flag = true;
+  bool fail = false;
   // compare authentication tag byte-by-byte
   for (size_t i = 0; i < 16; i++) {
-    flag &= (tag[i] == tag_[i]);
+    fail |= (tag[i] ^ tag_[i]);
   }
-  return flag;
+  return !fail;
 }
 
 }
