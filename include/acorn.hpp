@@ -240,6 +240,20 @@ process_plain_text(bool* const __restrict state,         // 293 -bit state
   }
 }
 
+// Decrypts ciphered bytes and writes them to allocated memory, following
+// algorithm defined in section 1.3.5 of Acorn specification
+// https://competitions.cr.yp.to/round3/acornv3.pdf
+static inline void
+process_cipher_text(
+  bool* const __restrict state,           // 293 -bit state
+  const uint8_t* const __restrict cipher, // ciphered data bytes
+  uint8_t* const __restrict text,         // plain text bytes
+  const size_t ct_len                     // can be >= 0
+)
+{
+  process_plain_text(state, cipher, text, ct_len);
+}
+
 // Finalize Acorn-128, which generates authentication tag; this is result of
 // authenticated encryption process & it also helps in conducting verified
 // decryption
@@ -278,6 +292,72 @@ finalize(bool* const __restrict state, uint8_t* const __restrict tag)
 
     tag[i] = t_byte;
   }
+}
+
+// Acorn-128 authenticated encryption, given `t_len` -bytes plain text, `d_len`
+// -bytes associated data, 128 -bit secret key & 128 -bit public message nonce,
+// this routine computes `c_len` -bytes encrypted text along with 128 -bit
+// authentication tag
+//
+// Note, assert t_len == c_len
+//
+// See algorithms defined in section 1.3.{3,4,5,6} of Acorn specification
+// https://competitions.cr.yp.to/round3/acornv3.pdf
+static inline void
+encrypt(const uint8_t* const __restrict key,   // 128 -bit secret key
+        const uint8_t* const __restrict nonce, // 128 -bit message nonce
+        const uint8_t* const __restrict text,  // plain text
+        const size_t t_len,                    // len(text)
+        const uint8_t* const __restrict data,  // associated data bytes
+        const size_t d_len,                    // len(data)
+        uint8_t* const __restrict cipher,      // encrypted bytes
+        const size_t c_len,                    // len(cipher); c_len == t_len
+        uint8_t* const __restrict tag          // 128 -bit authentication tag
+)
+{
+  // 293 -bit Acorn-128 state
+  bool state[STATE_BIT_LEN];
+
+  // 128 -bit secret key as bit sequence
+  bool key_[128];
+#pragma unroll 16
+  for (size_t i = 0; i < 16; i++) {
+    const size_t off = i << 3;
+
+    key_[off + 0] = bit_at<7>(key[i]);
+    key_[off + 1] = bit_at<6>(key[i]);
+    key_[off + 2] = bit_at<5>(key[i]);
+    key_[off + 3] = bit_at<4>(key[i]);
+    key_[off + 4] = bit_at<3>(key[i]);
+    key_[off + 5] = bit_at<2>(key[i]);
+    key_[off + 6] = bit_at<1>(key[i]);
+    key_[off + 7] = bit_at<0>(key[i]);
+  }
+
+  // 128 -bit public message nonce as bit sequence
+  bool nonce_[128];
+#pragma unroll 16
+  for (size_t i = 0; i < 16; i++) {
+    const size_t off = i << 3;
+
+    nonce_[off + 0] = bit_at<7>(nonce[i]);
+    nonce_[off + 1] = bit_at<6>(nonce[i]);
+    nonce_[off + 2] = bit_at<5>(nonce[i]);
+    nonce_[off + 3] = bit_at<4>(nonce[i]);
+    nonce_[off + 4] = bit_at<3>(nonce[i]);
+    nonce_[off + 5] = bit_at<2>(nonce[i]);
+    nonce_[off + 6] = bit_at<1>(nonce[i]);
+    nonce_[off + 7] = bit_at<0>(nonce[i]);
+  }
+
+  // see section 1.3.3
+  initialize(state, key_, nonce_);
+  // see section 1.3.4
+  process_associated_data(state, data, d_len);
+  // see section 1.3.5
+  process_plain_text(state, text, cipher, t_len);
+  // see section 1.3.6
+  finalize(state, tag);
 }
 
 }
