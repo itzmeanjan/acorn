@@ -19,6 +19,10 @@ main()
       test_acorn::encrypt_decrypt_failure(i, j, test_acorn::encrypted_data);
       // simulate failure in verified decryption by mutating authentication tag
       test_acorn::encrypt_decrypt_failure(i, j, test_acorn::authentication_tag);
+      // simulate failure in verified decryption by mutating message nonce
+      test_acorn::encrypt_decrypt_failure(i, j, test_acorn::nonce);
+      // simulate failure in verified decryption by mutating secret key
+      test_acorn::encrypt_decrypt_failure(i, j, test_acorn::secret_key);
     }
   }
 

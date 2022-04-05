@@ -8,14 +8,17 @@
 namespace test_acorn {
 
 // To simulate that verified decryption fails when either of associated data/
-// encrypted text bytes/ authentication tag ( 128 -bit ) is changed ( mutated ),
-// I've written one test case ( see `encrypt_decrypt_failure` ), where this enum
-// type can be passed as choice
+// encrypted text bytes/ authentication tag ( 128 -bit )/ public message nonce (
+// 128 -bit )/ secret key ( 128 -bit ) is mutated ( a single bit flip should
+// suffice ), I've written one test case ( see `encrypt_decrypt_failure` ),
+// where this enum type can be passed as choice of mutation
 enum mutate_t
 {
   associated_data,
   encrypted_data,
-  authentication_tag
+  authentication_tag,
+  nonce,
+  secret_key
 };
 
 // Test (authenticated) encrypt -> (verified) decrypt flow for given byte length
@@ -78,8 +81,9 @@ encrypt_decrypt_success(const size_t d_len, // associated data byte-length
 }
 
 // This test attempts to simulate that if any of associated data bytes/
-// encrypted data bytes/ authentication tag ( 128 -bit ) is changed ( say by
-// flipping a single bit ), verified decryption process must fail !
+// encrypted data bytes/ authentication tag ( 128 -bit )/ public message nonce/
+// secret key is changed ( say by flipping a single bit ), verified decryption
+// process must fail !
 static inline void
 encrypt_decrypt_failure(
   const size_t d_len,   // associated data byte-length
@@ -143,6 +147,16 @@ encrypt_decrypt_failure(
       tag[0] = static_cast<uint8_t>((tag[0] >> 1) << 1) |
                static_cast<uint8_t>(~(tag[0] & one) & one);
       break;
+    case mutate_t::nonce:
+      // nonce will always be 16 -bytes wide
+      nonce[0] = static_cast<uint8_t>((nonce[0] >> 1) << 1) |
+                 static_cast<uint8_t>(~(nonce[0] & one) & one);
+      break;
+    case mutate_t::secret_key:
+      // secret key will always be 16 -bytes wide
+      key[0] = static_cast<uint8_t>((key[0] >> 1) << 1) |
+               static_cast<uint8_t>(~(key[0] & one) & one);
+      break;
   }
 
   // Acorn-128 verified decryption; may fail, given that a single bit is flipped
@@ -166,6 +180,8 @@ encrypt_decrypt_failure(
       }
       break;
     case mutate_t::authentication_tag:
+    case mutate_t::nonce:
+    case mutate_t::secret_key:
       assert(!b);
       break;
   }
