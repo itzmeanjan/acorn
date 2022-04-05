@@ -7,6 +7,8 @@
 // https://en.wikipedia.org/wiki/Authenticated_encryption
 namespace test_acorn {
 
+// Test (authenticated) encrypt -> (verified) decrypt flow for given byte length
+// of associated data & plain text
 static inline void
 encrypt_decrypt(const size_t d_len, // associated data byte-length
                 const size_t ct_len // plain/ cipher text byte-length
