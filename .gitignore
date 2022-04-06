@@ -1,4 +1,7 @@
-a.out
+*.out
 *.so
 *.o
 .vscode
+fpga_emu_*
+fpga_opt_*
+fpga_hw_*
