@@ -47,7 +47,9 @@ from_be_bytes(const uint8_t* const __restrict bytes)
 static inline void
 to_be_bytes(const uint32_t word, uint8_t* const __restrict bytes)
 {
+#if defined(__clang__)
 #pragma unroll 4
+#endif
   for (size_t i = 0; i < 4; i++) {
     bytes[i] = static_cast<uint8_t>(word >> ((3u - i) << 3));
   }
