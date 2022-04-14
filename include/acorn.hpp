@@ -25,43 +25,11 @@ encrypt(const uint8_t* const __restrict key,   // 128 -bit secret key
         uint8_t* const __restrict tag          // 128 -bit authentication tag
 )
 {
-  // 293 -bit Acorn-128 state
-  bool state[acorn_utils::STATE_BIT_LEN];
-
-  // 128 -bit secret key as bit sequence
-  bool key_[128];
-#pragma unroll 16
-  for (size_t i = 0; i < 16; i++) {
-    const size_t off = i << 3;
-
-    key_[off + 0] = acorn_utils::bit_at<0>(key[i]);
-    key_[off + 1] = acorn_utils::bit_at<1>(key[i]);
-    key_[off + 2] = acorn_utils::bit_at<2>(key[i]);
-    key_[off + 3] = acorn_utils::bit_at<3>(key[i]);
-    key_[off + 4] = acorn_utils::bit_at<4>(key[i]);
-    key_[off + 5] = acorn_utils::bit_at<5>(key[i]);
-    key_[off + 6] = acorn_utils::bit_at<6>(key[i]);
-    key_[off + 7] = acorn_utils::bit_at<7>(key[i]);
-  }
-
-  // 128 -bit public message nonce as bit sequence
-  bool nonce_[128];
-#pragma unroll 16
-  for (size_t i = 0; i < 16; i++) {
-    const size_t off = i << 3;
-
-    nonce_[off + 0] = acorn_utils::bit_at<0>(nonce[i]);
-    nonce_[off + 1] = acorn_utils::bit_at<1>(nonce[i]);
-    nonce_[off + 2] = acorn_utils::bit_at<2>(nonce[i]);
-    nonce_[off + 3] = acorn_utils::bit_at<3>(nonce[i]);
-    nonce_[off + 4] = acorn_utils::bit_at<4>(nonce[i]);
-    nonce_[off + 5] = acorn_utils::bit_at<5>(nonce[i]);
-    nonce_[off + 6] = acorn_utils::bit_at<6>(nonce[i]);
-    nonce_[off + 7] = acorn_utils::bit_at<7>(nonce[i]);
-  }
+  // 293 -bit Acorn-128 state, zero initialize
+  uint64_t state[acorn_utils::LFSR_CNT] = { 0ul };
 
   // see section 1.3.3
-  acorn_utils::initialize(state, key_, nonce_);
+  acorn_utils::initialize(state, key, nonce);
   // see section 1.3.4
   acorn_utils::process_associated_data(state, data, d_len);
   // see section 1.3.5
@@ -93,45 +61,13 @@ decrypt(const uint8_t* const __restrict key,    // 128 -bit secret key
         uint8_t* const __restrict text          // decrypted bytes
 )
 {
-  // 293 -bit Acorn-128 state
-  bool state[acorn_utils::STATE_BIT_LEN];
+  // 293 -bit Acorn-128 state, zero initialize
+  uint64_t state[acorn_utils::LFSR_CNT] = { 0ul };
   // 128 -bit authentication tag
   uint8_t tag_[16];
 
-  // 128 -bit secret key as bit sequence
-  bool key_[128];
-#pragma unroll 16
-  for (size_t i = 0; i < 16; i++) {
-    const size_t off = i << 3;
-
-    key_[off + 0] = acorn_utils::bit_at<0>(key[i]);
-    key_[off + 1] = acorn_utils::bit_at<1>(key[i]);
-    key_[off + 2] = acorn_utils::bit_at<2>(key[i]);
-    key_[off + 3] = acorn_utils::bit_at<3>(key[i]);
-    key_[off + 4] = acorn_utils::bit_at<4>(key[i]);
-    key_[off + 5] = acorn_utils::bit_at<5>(key[i]);
-    key_[off + 6] = acorn_utils::bit_at<6>(key[i]);
-    key_[off + 7] = acorn_utils::bit_at<7>(key[i]);
-  }
-
-  // 128 -bit public message nonce as bit sequence
-  bool nonce_[128];
-#pragma unroll 16
-  for (size_t i = 0; i < 16; i++) {
-    const size_t off = i << 3;
-
-    nonce_[off + 0] = acorn_utils::bit_at<0>(nonce[i]);
-    nonce_[off + 1] = acorn_utils::bit_at<1>(nonce[i]);
-    nonce_[off + 2] = acorn_utils::bit_at<2>(nonce[i]);
-    nonce_[off + 3] = acorn_utils::bit_at<3>(nonce[i]);
-    nonce_[off + 4] = acorn_utils::bit_at<4>(nonce[i]);
-    nonce_[off + 5] = acorn_utils::bit_at<5>(nonce[i]);
-    nonce_[off + 6] = acorn_utils::bit_at<6>(nonce[i]);
-    nonce_[off + 7] = acorn_utils::bit_at<7>(nonce[i]);
-  }
-
   // see section 1.3.3
-  acorn_utils::initialize(state, key_, nonce_);
+  acorn_utils::initialize(state, key, nonce);
   // see section 1.3.4
   acorn_utils::process_associated_data(state, data, d_len);
   // see section 1.3.5
