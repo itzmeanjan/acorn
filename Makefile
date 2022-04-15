@@ -1,5 +1,5 @@
 CXX = dpcpp
-CXXFLAGS = -std=c++20 -Wall -Weverything -Wno-c++98-compat -Wno-c++98-c++11-compat-binary-literal
+CXXFLAGS = -std=c++20 -Wall -Weverything -Wno-c++98-compat -Wno-c++98-c++11-compat-binary-literal -Wno-c++98-compat-pedantic
 OPTFLAGS = -O3
 IFLAGS = -I ./include
 
