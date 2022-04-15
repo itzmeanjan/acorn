@@ -33,7 +33,7 @@ clean:
 format:
 	find . -name '*.cpp' -o -name '*.hpp' | xargs clang-format -i --style=Mozilla
 
-bench/a.out: bench/main.cpp include/*.hpp
+bench/a.out: bench/acorn.cpp include/*.hpp
 	# make sure you've google-benchmark globally installed
 	# see https://github.com/google/benchmark/tree/60b16f1#installation
 	$(CXX) $(CXXFLAGS) -Wno-global-constructors $(OPTFLAGS) $(IFLAGS) $< -lbenchmark -lpthread -o $@
@@ -54,3 +54,12 @@ fpga_opt_test: test/acorn_fpga.cpp include/*.hpp
 
 fpga_hw_test: test/acorn_fpga.cpp include/*.hpp
 	$(CXX) $(CXXFLAGS) $(FPGA_HW_FLAGS) $(OPTFLAGS) $(IFLAGS) -reuse-exe=test/$@.out $< -o test/$@.out
+
+fpga_emu_bench: bench/fpga_emu_bench.out
+	./$<
+
+bench/fpga_emu_bench.out: bench/acorn_fpga.cpp include/*.hpp
+	$(CXX) $(CXXFLAGS) -Wno-padded $(FPGA_EMU_FLAGS) $(OPTFLAGS) $(IFLAGS) $< -o $@
+
+fpga_hw_bench: bench/acorn_fpga.cpp include/*.hpp
+	$(CXX) $(CXXFLAGS) -Wno-padded $(FPGA_HW_FLAGS) $(OPTFLAGS) $(IFLAGS) -reuse-exe=bench/$@.out $< -o bench/$@.out
