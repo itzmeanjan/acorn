@@ -126,7 +126,7 @@ encrypt_decrypt(sycl::queue& q,               // SYCL job submission queue
 
   // transfer verification flags back to host
   sycl::event evt11 = q.submit([&](sycl::handler& h) {
-    h.depends_on(evt10);
+    h.depends_on(evt9);
     h.memcpy(flags_h, flags_d, flg_len);
   });
 
