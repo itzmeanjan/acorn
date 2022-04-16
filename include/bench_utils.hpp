@@ -51,14 +51,11 @@ to_readable_bandwidth(const size_t bytes, // bytes
   const double ts_ = static_cast<double>(ts) * 1e-9; // seconds
   const double bps = bytes_ / ts_;                   // bytes/ sec
 
-  std::stringstream ss;
-  ss << std::setprecision(2);
-
-  bps >= GB ? ss << (bps / GB) << " GB/ s"
-            : bps >= MB ? ss << (bps / MB) << " MB/ s"
-                        : bps >= KB ? ss << (bps / KB) << " KB/ s"
-                                    : ss << bps << " B/ s";
-  return ss.str();
+  return bps >= GB
+           ? (std::to_string(bps / GB) + " GB/ s")
+           : bps >= MB ? (std::to_string(bps / MB) + " MB/ s")
+                       : bps >= KB ? (std::to_string(bps / KB) + " KB/ s")
+                                   : (std::to_string(bps) + " B/ s");
 }
 
 // Executes accelerated Acorn-128 encrypt/ decrypt kernels ( chosen using
