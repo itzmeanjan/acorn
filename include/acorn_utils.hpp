@@ -491,7 +491,14 @@ finalize(uint64_t* const __restrict state, uint8_t* const __restrict tag)
   // take last 128 keystream bits & interpret it as authentication tag
   for (size_t i = 0; i < 4; i++) {
     const uint32_t ks = state_update_128(state, 0u, MAX_U32, MAX_U32);
-    to_be_bytes(ks, tag + (i << 2));
+    const size_t t_off = i << 2;
+
+#if defined(__clang__)
+#pragma unroll 4
+#endif
+    for (size_t j = 0; j < 4; j++) {
+      tag[t_off + j] = static_cast<uint8_t>(ks >> ((3u - j) << 3));
+    }
   }
 }
 
