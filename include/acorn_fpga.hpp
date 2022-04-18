@@ -17,9 +17,9 @@ class kernelAcorn128Decrypt;
 // length associated data byte slices need to be encrypted using Acorn-128, this
 // routine can be used for offloading computation to FPGA. This routine invokes
 // `acorn::encrypt` N -many times in a deeply pipelined loop ( iterative
-// fashion, as computation is offloaded as SYCL single_task ) & stores computed
-// encrypted byte slices & authentication tags ( each 128 -bit ) in respective
-// memory offsets.
+// fashion, because computation is offloaded as SYCL single_task ) & stores
+// computed encrypted byte slices & authentication tags ( each 128 -bit ) in
+// respective memory offsets.
 //
 // Input:
 //
@@ -28,13 +28,13 @@ class kernelAcorn128Decrypt;
 // - N -many plain text byte slices, each of length T -bytes
 // - N -many associated data byte slices, each of length D -bytes
 //
-// Note, avoid nonce reuse i.e. don't use same nonce with same secret key !
+// Note, avoid nonce reuse i.e. don't use same nonce twice with same secret key
 //
 // Output:
 //
 // - N -many encrypted text byte slices, each of length T -bytes
 // - N -many authentication tags, each 128 -bit
-// - SYCL event as result of job submission, can be used for constructing
+// - SYCL event as result of job submission, can be used for constructing SYCL
 // dependency graph
 //
 // Note, in function signature all data lengths are in terms of `bytes` !
@@ -93,12 +93,13 @@ encrypt(
 // Acorn-128 verified decryption on FPGA
 //
 // When N -many equal length encrypted text byte slices along with N -many equal
-// length associated data byte slices need to be decrypted using Acorn-128, this
-// routine can be used for offloading computation to FPGA. This routine invokes
-// `acorn::decrypt` N -many times in a deeply pipelined loop ( iterative
-// fashion, as computation is offloaded as SYCL single_task ) & stores computed
-// decrypted byte slices & verification flags ( each boolean value ) in
-// respective memory offsets.
+// length associated data byte slices ( associated data bytes aren't encrypted
+// in first place, but even a single bit flip must result in authentication
+// failure ) need to be decrypted using Acorn-128, this routine can be used for
+// offloading computation to FPGA. This routine invokes `acorn::decrypt` N -many
+// times in a deeply pipelined loop ( iterative fashion, as computation is
+// offloaded as SYCL single_task ) & stores computed decrypted byte slices &
+// verification flags ( each boolean value ) in respective memory offsets.
 //
 // Input:
 //
