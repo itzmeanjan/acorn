@@ -28,7 +28,7 @@ After that encrypted text can be decrypted by another party who has access to fo
 - 128 -bit secret key
 - 128 -bit public message nonce
 - 128 -bit authentication tag ( computed 👆 )
-- Encrypted bytes
+- Encrypted bytes ( computed 👆 )
 - Associated data bytes
 
 Verified decryption procedure should generate two pieces of outputs
@@ -40,16 +40,42 @@ After that boolean flag should be tested for truthfulness, if it doesn't pass th
 
 If any of authentication tag/ encrypted bytes/ associated data bytes are mutated ( even a single bit flipped ), verified decryption process should fail.
 
-Here I keep a C++ header-only library, implementing **Acorn128 v3**, which can be compiled down to CPU/ GPGPU ( using SYCL kernels ) executable code.
+Here I keep a C++ header-only library, implementing **Acorn128 v3**, which can be compiled down to CPU/ GPGPU ( using SYCL kernels ) executable code. Other than that single work-item SYCL kernels ( read SYCL `single_task` ) which can be used for synthesizing Acorn-128 FPGA h/w image, are also made available, accompanied with emulated testing ( to check functional correctness ), FPGA h/w benchmark & example usage code. Single work-item Acorn128 encrypt kernel takes following as input
 
-- How to test/ benchmark/ use `acorn` ?
-  - Can be found below.
+- N -many independent, non-overlapping, equal-length plain text byteslices
+- N -many independent, non-overlapping, equal-length associated data byteslices
+- N -many independent, non-overlapping secret keys ( each secret key is of 128 -bit )
+- N -many independent, non-overlapping public message nonces ( each nonce is of 128 -bit )
+
+Encrypt produces following in result
+
+- N -many independent, non-overlapping, equal-length encrypted byteslices
+- N -many independent, non-overlapping authentication tags ( each tag is of 128 -bit )
+
+Single work-item FPGA offloadable Acorn128 decrypt kernel takes following as input
+
+- N -many independent, non-overlapping, equal-length plain text byteslices
+- N -many independent, non-overlapping, equal-length associated data byteslices
+- N -many independent, non-overlapping secret keys ( each secret key is of 128 -bit )
+- N -many independent, non-overlapping public message nonces ( each nonce is of 128 -bit )
+- N -many independent, non-overlapping authentication tags ( each tag is of 128 -bit )
+
+Output computed by decrypt kernel looks like
+
+- N -many independent, non-overlapping, equal-length decrypted byteslices
+- N -many independent, non-overlapping verification flag ( each value is boolean )
+
+> Read more about SYCL [here](https://www.khronos.org/registry/SYCL)
+
+> Before consuming each of decrypted byteslices, make sure that respective verification flag is **true**, otherwise something is off !
 
 ## Prerequisites
 
 - Make sure you've installed `g++`/ `clang++`/ `dpcpp`; I prefer `dpcpp`, find more [here](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler.html)
 
 > If you happen to be using something other than `dpcpp`, consider updating Makefile.
+
+> If you're interested in synthesizing FPGA h/w image, you must have `dpcpp` along with supported FPGA h/w such as Intel Arria 10 or Intel Stratix 10. I prefer using Intel Devcloud; find more about FPGA synthesis/ execution on Intel Devcloud [here](https://github.com/intel/FPGA-Devcloud/tree/9a7370d)
 
 ```bash
 $ dpcpp --version
@@ -82,13 +108,13 @@ $ cmake --version
 cmake version 3.16.3
 ```
 
-- For benchmarking Acorn128 implementation, you must have `google-benchmark` globally installed; see [here](https://github.com/google/benchmark/tree/60b16f1#installation)
+- For benchmarking Acorn128 implementation on CPU, you must have `google-benchmark` globally installed; see [here](https://github.com/google/benchmark/tree/60b16f1#installation)
 
 - Make sure you've C++ standard library, implementing `C++20` specification, installed
 
 ## Testing
 
-For testing functional correctness of Acorn128 cipher suite, run
+For testing functional correctness of Acorn128 cipher suite on CPU, run
 
 ```bash
 make
@@ -103,6 +129,12 @@ This will run two kinds of tests
   - 128 -bit authentication tag
   - 128 -bit public message nonce
   - 128 -bit secret key
+
+To be sure that sythesized FPGA h/w image from Acorn128 encrypt/ decrypt kernels behave as they should, emulate FPGA design using
+
+```bash
+make fpga_emu_test
+```
 
 ## Benchmarking
 
@@ -145,120 +177,39 @@ acorn_decrypt_4096B_32B      14770 ns        14770 ns        47390 bytes_per_sec
 
 > In above console output, `acorn_{encrypt|decrypt}_X_Y` denotes for testing encrypt/ decrypt routine of Acorn128 cipher suite plain text/ cipher text length is X -bytes while associated data length is Y -bytes. You'll notice Y = 32 -bytes always, while X is varied !
 
+For benchmarking Acorn128 cipher suite implementation on FPGA h/w, see [here](./results/fpga.md)
+
 ## Usage
 
-`acorn` is a header-only C++ library, using it is as easy as including header file `include/acorn.hpp` in your program & adding `./include` directory to your `INCLUDE_PATH` during compilation. 
+`acorn` is a header-only C++ library, using it is as easy as including header file `include/acorn.hpp` in your program & adding `./include` directory to your `INCLUDE_PATH` during compilation.
 
 - **A**uthenticated **E**ncryption with **A**ssociated **D**ata related routines that you'll be generally interested in, are kept in `acorn::` namespace.
-
+- FPGA synthesizable Acorn-128 AEAD kernels are kept in `acorn_fpga::` namespace, whose implementation is available in `include/acorn_fpga.hpp`
 - Also see `include/utils.hpp`, if that helps you in anyways.
 
-```cpp
-// see https://github.com/itzmeanjan/acorn/blob/10f524a/example/acorn128.cpp
+See full example of using
 
-#include "acorn.hpp"
-#include "utils.hpp"
-#include <cassert>
-#include <iostream>
-#include <string.h>
+- Acorn128 API [here](https://github.com/itzmeanjan/acorn/blob/10f524a/example/acorn128.cpp)
+- Acorn128 FPGA Kernels [here](https://github.com/itzmeanjan/acorn/blob/b622943/example/acorn128_fpga.cpp)
 
-// Compile it with `dpcpp -std=c++20 -O3 -I ./include example/acorn128.cpp`
-int
-main()
-{
-  // plain text/ encrypted bytes length
-  constexpr size_t ct_len = 32ul;
-  // associated data length
-  constexpr size_t d_len = 16ul;
-  // secret key/ nonce/ authentication tag length
-  constexpr size_t knt_len = 16ul;
+## FPGA Optimization Report
 
-  assert(knt_len == 16ul); // don't change it; must be 128 -bit
+One can use `dpcpp` compiler along with Intel oneAPI basekit for generating FPGA optimization reports based on early linked FPGA image. Issue following command for doing so
 
-  // plain text
-  uint8_t* txt = static_cast<uint8_t*>(malloc(ct_len));
-  // encrypted text
-  uint8_t* enc = static_cast<uint8_t*>(malloc(ct_len));
-  // decrypted text
-  uint8_t* dec = static_cast<uint8_t*>(malloc(ct_len));
-  // associated data
-  uint8_t* data = static_cast<uint8_t*>(malloc(d_len));
-  // 128 -bit secret key
-  uint8_t* key = static_cast<uint8_t*>(malloc(knt_len));
-  // 128 -bit public message nonce
-  uint8_t* nonce = static_cast<uint8_t*>(malloc(knt_len));
-  // 128 -bit authentication tag
-  uint8_t* tag = static_cast<uint8_t*>(malloc(knt_len));
-
-  // prepare plain text ( deterministic )
-  for (size_t i = 0; i < ct_len; i++) {
-    txt[i] = static_cast<uint8_t>(i);
-  }
-
-  // prepare associated data ( deterministic )
-  for (size_t i = 0; i < d_len; i++) {
-    data[i] = static_cast<uint8_t>(i);
-  }
-
-  // prepare secret key & nonce ( deterministic )
-  for (size_t i = 0; i < knt_len; i++) {
-    key[i] = static_cast<uint8_t>(i);
-    nonce[i] = static_cast<uint8_t>((~i));
-  }
-
-  // clear memory for encrypted text
-  memset(enc, 0, ct_len);
-  // clear memory for decrypted text
-  memset(dec, 0, ct_len);
-  // clear memory for authentication tag
-  memset(tag, 0, knt_len);
-
-  // encrypt plain text using Acorn-128
-  acorn::encrypt(key, nonce, txt, ct_len, data, d_len, enc, tag);
-  // decrypt to plain text using Acorn-128
-  const bool f = acorn::decrypt(key, nonce, tag, enc, ct_len, data, d_len, dec);
-
-  // to be 100% sure that verified decryption worked as expected !
-  assert(f);
-
-  // byte-by-byte match that original plain text & decrypted text are same !
-  for (size_t i = 0; i < ct_len; i++) {
-    assert(txt[i] == dec[i]);
-  }
-
-  std::cout << "plain text         : " << to_hex(txt, ct_len) << std::endl;
-  std::cout << "associated data    : " << to_hex(data, d_len) << std::endl;
-  std::cout << "secret key         : " << to_hex(key, knt_len) << std::endl;
-  std::cout << "message nonce      : " << to_hex(nonce, knt_len) << std::endl;
-  std::cout << "encrypted          : " << to_hex(enc, ct_len) << std::endl;
-  std::cout << "authentication tag : " << to_hex(tag, knt_len) << std::endl;
-  std::cout << "decrypted text     : " << to_hex(dec, ct_len) << std::endl;
-
-  // deallocate all memory resources
-  free(txt);
-  free(enc);
-  free(dec);
-  free(data);
-  free(key);
-  free(nonce);
-  free(tag);
-
-  return EXIT_SUCCESS;
-}
-```
-
-Now compile & execute it with
+> Find more about Intel oneAPI basekit [here](https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit.html#gs.xs0wio)
 
 ```bash
-$ g++ -std=c++20 -O3 -I ./include example/acorn128.cpp && ./a.out
-
-plain text         : 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
-associated data    : 000102030405060708090a0b0c0d0e0f
-secret key         : 000102030405060708090a0b0c0d0e0f
-message nonce      : fffefdfcfbfaf9f8f7f6f5f4f3f2f1f0
-encrypted          : b42e4dca2acefdec58da849a2decace7952706881fef46b8abd39d3ac02a9f41
-authentication tag : 06288070f2f06b8f31eaa90341f080a5
-decrypted text     : 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+make fpga_opt_test
 ```
 
-See full example of using Acorn128 API [here](https://github.com/itzmeanjan/acorn/blob/10f524a/example/acorn128.cpp)
+These estimates are helpful during development, as it allows one to get feedback on FPGA design without waiting for lengthy FPGA h/w synthesis phase.
+
+Note, it doesn't produce any executable binary, instead render `test/reports/report.html` to view FPGA optimization report. 
+
+## FPGA Design
+
+After going through a lengthy ( ~02:30 hours ) FPGA h/w synthesis phase, while targeting Intel Arria 10 board on Intel Devcloud, I obtained following results in optimization report.
+
+![clock_freq](./opt/clock_freq.png)
+![area_usage](./opt/area_usage.png)
+![res_utilization](./opt/res_util.png)
