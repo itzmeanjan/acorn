@@ -1,3 +1,4 @@
+#pragma once
 #include "acorn.hpp"
 #include "utils.hpp"
 #include <cassert>
