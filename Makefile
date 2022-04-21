@@ -1,6 +1,7 @@
 CXX = dpcpp
 CXXFLAGS = -std=c++20 -Wall -Weverything -Wno-c++98-compat -Wno-c++98-c++11-compat-binary-literal -Wno-c++98-compat-pedantic
 OPTFLAGS = -O3
+SYCLFLAGS = -fsycl
 IFLAGS = -I ./include
 
 # Actually compiled code to be executed on host CPU, to be used only for testing functional correctness
@@ -63,3 +64,9 @@ bench/fpga_emu_bench.out: bench/acorn_fpga.cpp include/*.hpp
 
 fpga_hw_bench: bench/acorn_fpga.cpp include/*.hpp
 	$(CXX) $(CXXFLAGS) -Wno-padded $(FPGA_HW_FLAGS) $(OPTFLAGS) $(IFLAGS) -reuse-exe=bench/$@.out $< -o bench/$@.out
+
+accel_test: test/accel_test.out
+	./$<
+
+test/accel_test.out: test/accel_acorn.cpp include/*.hpp
+	$(CXX) $(CXXFLAGS) $(SYCLFLAGS) $(OPTFLAGS) $(IFLAGS) $< -o $@
