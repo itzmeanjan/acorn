@@ -2,26 +2,32 @@
 #include "table.hpp"
 #include <iostream>
 
-#if !(defined FPGA_EMU || defined FPGA_HW)
-#define FPGA_EMU
-#endif
-
 int
 main()
 {
   // associated data byte length, same for all cases
   constexpr size_t dt_len = 32ul;
-  // min # -of times for loop to be iterated in single work-item Acorn kernel
-  constexpr size_t min_invk_cnt = 1ul << 16;
-  // max # -of times for loop to be iterated in single work-item Acorn kernel
-  constexpr size_t max_invk_cnt = 1ul << 18;
+  // min # -of work-items to be dispatched
+  constexpr size_t min_wi_cnt = 1ul << 16;
+  // max # -of work-items to be dispatched
+  constexpr size_t max_wi_cnt = 1ul << 18;
+  // # -of work-items to be grouped during execution
+  //
+  // @note, consider taking better decision about appropriate work-group size
+  // for certain kernel at runtime based on SYCL runtime heuristics
+  constexpr size_t wg_size = 32ul;
   constexpr size_t min_ct_len = 64ul;   // bytes
   constexpr size_t max_ct_len = 4096ul; // bytes
 
-#if defined FPGA_EMU
-  sycl::ext::intel::fpga_emulator_selector s{};
-#elif defined FPGA_HW
-  sycl::ext::intel::fpga_selector s{};
+#if defined SYCL_TARGET_CPU
+  sycl::cpu_selector s{};
+#pragma message("Selecting default CPU accelerator !")
+#elif defined SYCL_TARGET_GPU
+  sycl::gpu_selector s{};
+#pragma message("Selecting default GPU accelerator !")
+#else
+  sycl::default_selector s{};
+#pragma message("Selecting default SYCL accelerator !")
 #endif
 
   sycl::device d{ s };
@@ -47,14 +53,14 @@ main()
   t0.add("device-to-host b/w");
   t0.endOfRow();
 
-  for (size_t invk = min_invk_cnt; invk <= max_invk_cnt; invk <<= 1) {
+  for (size_t invk = min_wi_cnt; invk <= max_wi_cnt; invk <<= 1) {
     for (size_t ct_len = min_ct_len; ct_len <= max_ct_len; ct_len <<= 1) {
       bench_acorn::exec_kernel(q,
                                ct_len,
                                dt_len,
                                invk,
-                               0,
-                               bench_acorn::acorn_type::acorn_encrypt_fpga,
+                               wg_size,
+                               bench_acorn::acorn_type::accel_acorn_encrypt,
                                ts,
                                io);
 
@@ -89,14 +95,14 @@ main()
   t1.add("device-to-host b/w");
   t1.endOfRow();
 
-  for (size_t invk = min_invk_cnt; invk <= max_invk_cnt; invk <<= 1) {
+  for (size_t invk = min_wi_cnt; invk <= max_wi_cnt; invk <<= 1) {
     for (size_t ct_len = min_ct_len; ct_len <= max_ct_len; ct_len <<= 1) {
       bench_acorn::exec_kernel(q,
                                ct_len,
                                dt_len,
                                invk,
-                               0,
-                               bench_acorn::acorn_type::acorn_decrypt_fpga,
+                               wg_size,
+                               bench_acorn::acorn_type::accel_acorn_decrypt,
                                ts,
                                io);
 
