@@ -53,18 +53,18 @@ main()
   t0.add("device-to-host b/w");
   t0.endOfRow();
 
-  for (size_t invk = min_wi_cnt; invk <= max_wi_cnt; invk <<= 1) {
+  for (size_t wi = min_wi_cnt; wi <= max_wi_cnt; wi <<= 1) {
     for (size_t ct_len = min_ct_len; ct_len <= max_ct_len; ct_len <<= 1) {
       bench_acorn::exec_kernel(q,
                                ct_len,
                                dt_len,
-                               invk,
+                               wi,
                                wg_size,
                                bench_acorn::acorn_type::accel_acorn_encrypt,
                                ts,
                                io);
 
-      t0.add(std::to_string(invk));
+      t0.add(std::to_string(wi));
       t0.add(std::to_string(ct_len));
       t0.add(std::to_string(dt_len));
       t0.add(bench_acorn::to_readable_bandwidth(io[0], ts[0]));
@@ -95,18 +95,18 @@ main()
   t1.add("device-to-host b/w");
   t1.endOfRow();
 
-  for (size_t invk = min_wi_cnt; invk <= max_wi_cnt; invk <<= 1) {
+  for (size_t wi = min_wi_cnt; wi <= max_wi_cnt; wi <<= 1) {
     for (size_t ct_len = min_ct_len; ct_len <= max_ct_len; ct_len <<= 1) {
       bench_acorn::exec_kernel(q,
                                ct_len,
                                dt_len,
-                               invk,
+                               wi,
                                wg_size,
                                bench_acorn::acorn_type::accel_acorn_decrypt,
                                ts,
                                io);
 
-      t1.add(std::to_string(invk));
+      t1.add(std::to_string(wi));
       t1.add(std::to_string(ct_len));
       t1.add(std::to_string(dt_len));
       t1.add(bench_acorn::to_readable_bandwidth(io[0], ts[0]));
