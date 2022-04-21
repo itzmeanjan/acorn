@@ -2,6 +2,7 @@ CXX = dpcpp
 CXXFLAGS = -std=c++20 -Wall -Weverything -Wno-c++98-compat -Wno-c++98-c++11-compat-binary-literal -Wno-c++98-compat-pedantic
 OPTFLAGS = -O3
 SYCLFLAGS = -fsycl
+SYCLCUDAFLAGS = -fsycl-targets=nvptx64-nvidia-cuda
 IFLAGS = -I ./include
 
 # Actually compiled code to be executed on host CPU, to be used only for testing functional correctness
@@ -70,3 +71,32 @@ accel_test: test/accel_test.out
 
 test/accel_test.out: test/accel_acorn.cpp include/*.hpp
 	$(CXX) $(CXXFLAGS) $(SYCLFLAGS) $(OPTFLAGS) $(IFLAGS) $< -o $@
+
+aot_cpu:
+	@if lscpu | grep -q 'avx512'; then \
+		echo "Using avx512"; \
+		$(CXX) -std=c++20 -Wall -DSYCL_TARGET_CPU $(SYCLFLAGS) $(OPTFLAGS) $(IFLAGS) -fsycl-targets=spir64_x86_64 -Xs "-march=avx512" bench/accel_acorn.cpp -o bench/a.out; \
+	elif lscpu | grep -q 'avx2'; then \
+		echo "Using avx2"; \
+		$(CXX) -std=c++20 -Wall -DSYCL_TARGET_CPU $(SYCLFLAGS) $(OPTFLAGS) $(IFLAGS) -fsycl-targets=spir64_x86_64 -Xs "-march=avx2" bench/accel_acorn.cpp -o bench/a.out; \
+	elif lscpu | grep -q 'avx'; then \
+		echo "Using avx"; \
+		$(CXX) -std=c++20 -Wall -DSYCL_TARGET_CPU $(SYCLFLAGS) $(OPTFLAGS) $(IFLAGS) -fsycl-targets=spir64_x86_64 -Xs "-march=avx" bench/accel_acorn.cpp -o bench/a.out; \
+	elif lscpu | grep -q 'sse4.2'; then \
+		echo "Using sse4.2"; \
+		$(CXX) -std=c++20 -Wall -DSYCL_TARGET_CPU $(SYCLFLAGS) $(OPTFLAGS) $(IFLAGS) -fsycl-targets=spir64_x86_64 -Xs "-march=sse4.2" bench/accel_acorn.cpp -o bench/a.out; \
+	else \
+		echo "Can't AOT compile using avx, avx2, avx512 or sse4.2"; \
+	fi
+	./bench/a.out
+
+aot_gpu:
+	# you may want to replace `device` identifier with `0x3e96` if you're targeting *Intel(R) UHD Graphics P630*
+	#
+	# otherwise, let it be what it's if you're targeting *Intel(R) Iris(R) Xe MAX Graphics*
+	$(CXX) -std=c++20 -Wall -DSYCL_TARGET_GPU $(SYCLFLAGS) $(OPTFLAGS) $(IFLAGS) -fsycl-targets=spir64_gen -Xs "-device 0x4905" bench/accel_acorn.cpp -o bench/a.out
+	./bench/a.out
+
+cuda:
+	clang++ -std=c++20 -Wall -DSYCL_TARGET_GPU $(SYCLFLAGS) $(SYCLCUDAFLAGS) $(OPTFLAGS) $(IFLAGS) bench/accel_acorn.cpp -o bench/a.out
+	./bench/a.out
