@@ -177,14 +177,16 @@ decrypt(
         const size_t ct_off = idx * per_wi_ct_len;
         const size_t ad_off = idx * per_wi_ad_len;
 
-        acorn::decrypt(key + knt_off,
-                       nonce + knt_off,
-                       tag + knt_off,
-                       enc + ct_off,
-                       per_wi_ct_len,
-                       data + ad_off,
-                       per_wi_ad_len,
-                       text + ct_off);
+        const bool flg = acorn::decrypt(key + knt_off,
+                                        nonce + knt_off,
+                                        tag + knt_off,
+                                        enc + ct_off,
+                                        per_wi_ct_len,
+                                        data + ad_off,
+                                        per_wi_ad_len,
+                                        text + ct_off);
+
+        flag[idx] = flg;
       });
   });
   return evt;
