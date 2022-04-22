@@ -1,4 +1,5 @@
 #pragma once
+#include "accel_acorn.hpp"
 #include "acorn_fpga.hpp"
 #include "utils.hpp"
 
@@ -6,17 +7,22 @@
 #define MB 1048576.    // 1 << 20 bytes
 #define KB 1024.       // 1 << 10 bytes
 
-// Benchmark Acorn-128 AEAD implementation, targeting FPGA using SYCL/ DPC++
-namespace bench_acorn_fpga {
+// Benchmark Acorn-128 AEAD implementation, targeting multi-core CPUs/ GPGPUs/
+// FPGAs using SYCL/ DPC++
+namespace bench_acorn {
 
 // Which one to benchmark
 //
 // 0) Acorn-128 single work-item encrypt routine on FPGA
 // 1) Acorn-128 single work-item decrypt routine on FPGA
+// 2) Accelerated Acorn-128 encrypt routine on multi-core CPU/ GPGPU
+// 3) Accelerated Acorn-128 decrypt routine on multi-core CPU/ GPGPU
 enum acorn_type
 {
-  acorn_encrypt,
-  acorn_decrypt,
+  acorn_encrypt_fpga,
+  acorn_decrypt_fpga,
+  accel_acorn_encrypt,
+  accel_acorn_decrypt,
 };
 
 // Time execution of SYCL command, whose submission resulted into given SYCL
@@ -59,10 +65,12 @@ to_readable_bandwidth(const size_t bytes, // bytes
 }
 
 // Executes accelerated Acorn-128 encrypt/ decrypt kernels ( chosen using
-// `type` parameter ) on FPGA, on `invk_cnt` -many ( read single work-item SYCL
-// FPGA kernel is iterated those many times ) independent input byte slices (
-// plain text/ cipher text/ associated data ), while returning how much time
-// spent on following
+// `type` parameter ) on multi-core CPU/ GPGPU/ FPGA, on `invk_cnt` -many ( read
+// single work-item SYCL FPGA kernel is iterated those many times/ when it's
+// multi work-item SYCL kernel these many work-items to be dispatched )
+// independent, non-overlapping & equal-length input byte slices ( plain text/
+// cipher text/ associated data ), while returning how much time spent on
+// following
 //
 // - host -> device input tx time ( total )
 // - kernel execution time
@@ -74,11 +82,19 @@ to_readable_bandwidth(const size_t bytes, // bytes
 // - bytes of data transferred from host -> device
 // - bytes of data consumed during encryption/ decryption
 // - bytes of data transferred from device -> host
+//
+// With values returned from this function, one should be able to compute
+// following
+//
+// - host -> device data transfer bandwidth ( say bytes/ sec )
+// - SYCL kernel data processing bandwidth ( say bytes/ sec )
+// - device -> host data transfer bandwidth ( say bytes/ sec )
 static inline void
 exec_kernel(sycl::queue& q,                // SYCL job submission queue
             const size_t per_invk_ct_len,  // bytes
             const size_t per_invk_dt_len,  // bytes
-            const size_t invk_cnt,         // to be invoked these many times
+            const size_t invk_cnt,         // # -of work items to be dispatched
+            const size_t wg_size,          // # -of work-items to be grouped
             acorn_type type,               // which Acorn routine to benchmark
             uint64_t* const __restrict ts, // time spent on activities
             size_t* const __restrict io    // processed bytes during activities
@@ -86,6 +102,14 @@ exec_kernel(sycl::queue& q,                // SYCL job submission queue
 {
   // SYCL queue must have profiling enabled !
   assert(q.has_property<sycl::property::queue::enable_profiling>());
+  if (type == acorn_encrypt_fpga || type == acorn_decrypt_fpga) {
+    // because when offloading compute job to FPGA, it's single work-item kernel
+    assert(wg_size == 0);
+  } else {
+    // while offloading to multi-core CPU/ GPGPU, it's multi work-item kernel (
+    // i.e. SYCL `parallel_for` )
+    assert(wg_size > 0);
+  }
 
   const size_t ct_len = invk_cnt * per_invk_ct_len; // alloc memory of bytes
   const size_t dt_len = invk_cnt * per_invk_dt_len; // alloc memory of bytes
@@ -156,40 +180,78 @@ exec_kernel(sycl::queue& q,                // SYCL job submission queue
   std::vector<sycl::event> evts0{ evt0, evt1, evt2, evt3, evt4, evt6 };
 
   // Acorn-128 authenticated encryption on accelerator
-  sycl::event evt8 = acorn_fpga::encrypt(q,
-                                         keys_d,
-                                         knt_len,
-                                         nonces_d,
-                                         knt_len,
-                                         txt_d,
-                                         ct_len,
-                                         data_d,
-                                         dt_len,
-                                         enc_d,
-                                         ct_len,
-                                         tags_d,
-                                         knt_len,
-                                         invk_cnt,
-                                         evts0);
+  sycl::event evt8 = type == acorn_encrypt_fpga || type == acorn_decrypt_fpga
+                       ? acorn_fpga::encrypt(q,
+                                             keys_d,
+                                             knt_len,
+                                             nonces_d,
+                                             knt_len,
+                                             txt_d,
+                                             ct_len,
+                                             data_d,
+                                             dt_len,
+                                             enc_d,
+                                             ct_len,
+                                             tags_d,
+                                             knt_len,
+                                             invk_cnt,
+                                             evts0)
+                       : accel_acorn::encrypt(q,
+                                              keys_d,
+                                              knt_len,
+                                              nonces_d,
+                                              knt_len,
+                                              txt_d,
+                                              ct_len,
+                                              data_d,
+                                              dt_len,
+                                              enc_d,
+                                              ct_len,
+                                              tags_d,
+                                              knt_len,
+                                              invk_cnt,
+                                              wg_size,
+                                              evts0);
+
+  std::vector<sycl::event> evts1{ evt5, evt7, evt8 };
 
   // Acorn-128 verified decryption on accelerator
-  sycl::event evt9 = acorn_fpga::decrypt(q,
-                                         keys_d,
-                                         knt_len,
-                                         nonces_d,
-                                         knt_len,
-                                         tags_d,
-                                         knt_len,
-                                         enc_d,
-                                         ct_len,
-                                         data_d,
-                                         dt_len,
-                                         dec_d,
-                                         ct_len,
-                                         flags_d,
-                                         flg_len,
-                                         invk_cnt,
-                                         { evt5, evt7, evt8 });
+  sycl::event evt9 = type == acorn_encrypt_fpga || type == acorn_decrypt_fpga
+                       ? acorn_fpga::decrypt(q,
+                                             keys_d,
+                                             knt_len,
+                                             nonces_d,
+                                             knt_len,
+                                             tags_d,
+                                             knt_len,
+                                             enc_d,
+                                             ct_len,
+                                             data_d,
+                                             dt_len,
+                                             dec_d,
+                                             ct_len,
+                                             flags_d,
+                                             flg_len,
+                                             invk_cnt,
+                                             evts1)
+                       : accel_acorn::decrypt(q,
+                                              keys_d,
+                                              knt_len,
+                                              nonces_d,
+                                              knt_len,
+                                              tags_d,
+                                              knt_len,
+                                              enc_d,
+                                              ct_len,
+                                              data_d,
+                                              dt_len,
+                                              dec_d,
+                                              ct_len,
+                                              flags_d,
+                                              flg_len,
+                                              invk_cnt,
+                                              wg_size,
+                                              evts1);
 
   // transfer deciphered text back to host
   sycl::event evt10 = q.submit([&](sycl::handler& h) {
@@ -215,8 +277,8 @@ exec_kernel(sycl::queue& q,                // SYCL job submission queue
     h.memcpy(tags_h, tags_d, knt_len);
   });
 
-  std::vector<sycl::event> evts1{ evt10, evt11, evt12, evt13 };
-  sycl::event evt14 = q.ext_oneapi_submit_barrier(evts1);
+  std::vector<sycl::event> evts2{ evt10, evt11, evt12, evt13 };
+  sycl::event evt14 = q.ext_oneapi_submit_barrier(evts2);
 
   // host synchronization i.e. blocking call !
   evt14.wait();
@@ -231,7 +293,7 @@ exec_kernel(sycl::queue& q,                // SYCL job submission queue
     }
   }
 
-  if (type == acorn_encrypt) {
+  if (type == acorn_encrypt_fpga || type == accel_acorn_encrypt) {
     const uint64_t t0 = time_event(evt0) + time_event(evt1);
     const uint64_t t1 = time_event(evt2) + time_event(evt3);
 
@@ -242,7 +304,7 @@ exec_kernel(sycl::queue& q,                // SYCL job submission queue
     io[0] = ct_len + dt_len + 2 * knt_len;
     io[1] = ct_len + dt_len;
     io[2] = ct_len + knt_len;
-  } else if (type == acorn_decrypt) {
+  } else if (type == acorn_decrypt_fpga || type == accel_acorn_decrypt) {
     const uint64_t t0 = time_event(evt0) + time_event(evt1);
     const uint64_t t1 = time_event(evt2) + time_event(evt3) * 2;
 
